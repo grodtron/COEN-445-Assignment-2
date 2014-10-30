@@ -22,17 +22,20 @@ class HDLC:
 		# send
 		pass
 	
-	def send(self, data):
-		# prepend control
-		# prepend address
-		# append FCS (dummy)
-		# bit stuffing
-		# append / prepend flags
-		# send
+	def send(self, address, data, size):
+		print bin(data)
+		data = (((address<<(size+8)) | (self._makecontrol()<<size) | data)<<16) | 0x0F55
+		size += 32
+		data, size = self._bitstuff(data, size)
+		data = (((0b01111110<<size) | data)<<8) | 0b01111110
+		open("test.txt", "a").write( bin(data))
 		pass
 	
-	def _bitstuff(self, data):
-		width = (10**5)
+	def _makecontrol(self):
+		return (self.send_window_start<<4) | self.recv_window_start
+	
+	def _bitstuff(self, data, size):
+		width = size
 		i = width
 		m = self.mask << i
 		while m != self.mask:
@@ -51,7 +54,7 @@ class HDLC:
 				# could optimize by incrementing i conditionally, but I don't care enough
 			m = m >> 1
 			i -= 1
-		return data
+		return data, width
 
 	def _unbitstuff(self, data, length):
 		width = length + 1
@@ -82,10 +85,5 @@ class HDLC:
 if __name__ == '__main__':
 	hdlc = HDLC()
 	
-	for i in xrange(2**30):
-		if i != hdlc._unbitstuff(hdlc._bitstuff(i), len(bin(i))-len('0b')):
-			print "Error on " + str(i)
-			print "  original => " + bin(i)
-			print "  stuff    => " + bin(hdlc._bitstuff(i))
-			print "  unstuff  => " + bin(hdlc._unbitstuff(hdlc._bitstuff(i), len(bin(i))-len('0b')))
+	hdlc.send(127, 0xFFFF, 32)
 			
