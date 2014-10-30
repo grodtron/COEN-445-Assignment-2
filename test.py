@@ -1,4 +1,5 @@
 from itertools import izip, islice
+from random import random
 
 def from_big_int(data):
 	data = hex(data)[2:].replace("L","")
@@ -31,38 +32,42 @@ class HDLC:
 		size = len(data) * 8
 		data = to_big_int(data)
 		
-		out.write(bin(data)+"\n")
-		if data & 0xFF != self.flag:
-			# TODO send REJ
-			return False
-		
 		# locate true start of message using the flag
 		mask   = 0xff << (size - 8)
 		target = self.flag << (size - 8)
-		while mask & data != target:
+		while mask & data != target and size >= 8:
 			mask   = mask >> 1
 			target = target >> 1
 			size -= 1
+
+		# reject frames if they're actually bad or just randomly to simulate noise and stuff
+		if  data & 0xFF != self.flag or size < 8 or random() < 0.2:
+			# TODO send REJ
+			return False
+
+
 		# clear flags
 		data ^= target
 		data = data >> 8
 		size -= 16
 		
 		data, size = self._unbitstuff(data, size)
-		out.write(bin(data)+"\n")
 		
 		address = data >> (size-8)
 		control = (data >> (size-16)) & 0xFF
 		data    = ((((1 << (size-16))-1)&data) >> 16)
 
-		out.writelines((bin(address), bin(control), bin(data)))
-		# prepend control
-		# prepend address
-		# append FCS (dummy)
-		# bit stuffing
-		# append / prepend flags
-		# send
-		pass
+		sent_seq_num = (control >> 4) & 0b111
+		ackd_seq_num =     control    & 0b111
+		
+		if sent_seq_num == self.recv_window_start:
+			self.recv_window_start += 1
+		else:
+			# TODO send reject
+			return False
+		
+		# TODO - is this right?
+		self.send_window_end = ackd_seq_num + self.n
 	
 	def send(self, address, data, size):
 		data = (((address<<(size+8)) | (self._makecontrol()<<size) | data)<<16) | 0x0F55
