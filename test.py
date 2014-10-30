@@ -1,31 +1,61 @@
 from itertools import izip, islice
 
-def from_big_int(data, length):
-	data = hex(data)[2:-1].zfill(length)
+def from_big_int(data):
+	data = hex(data)[2:].replace("L","")
+	if len(data) % 2 == 1:
+		data = "0" + data
 	return ''.join( chr( int(a,16)<<4 | int(b,16) ) for a,b in izip(islice(data, 0, None, 2), islice(data, 1, None, 2)) )
 	
 def to_big_int(data):
 	return reduce( lambda a,b: (a<<8)|ord(b), data, 0 )
 
-
+out = open("test.txt", "a")
+	
 class HDLC:
 
 	def __init__(self):
 		self.n = 7
 		self.k = 3
-		self.recv_window_start = 0
+		self.recv_window_start = 7
 		self.recv_window_end   = self.recv_window_start + self.n - 1
 
-		self.send_window_start = 0
+		self.send_window_start = 7
 		self.send_window_end   = self.send_window_start + self.n - 1
 		
 		self.flag = 0b01111110
 		self.mask = 0b11111
 		
 	
-	def recv(self):
-		data = b'thisissomeshitrighthere'
-		size = 1
+	def recv(self, data):
+		# get approx size in bits
+		size = len(data) * 8
+		data = to_big_int(data)
+		
+		out.write(bin(data)+"\n")
+		if data & 0xFF != self.flag:
+			# TODO send REJ
+			return False
+		
+		# locate true start of message using the flag
+		mask   = 0xff << (size - 8)
+		target = self.flag << (size - 8)
+		while mask & data != target:
+			mask   = mask >> 1
+			target = target >> 1
+			size -= 1
+		# clear flags
+		data ^= target
+		data = data >> 8
+		size -= 16
+		
+		data, size = self._unbitstuff(data, size)
+		out.write(bin(data)+"\n")
+		
+		address = data >> (size-8)
+		control = (data >> (size-16)) & 0xFF
+		data    = ((((1 << (size-16))-1)&data) >> 16)
+
+		out.writelines((bin(address), bin(control), bin(data)))
 		# prepend control
 		# prepend address
 		# append FCS (dummy)
@@ -39,7 +69,7 @@ class HDLC:
 		size += 32
 		data, size = self._bitstuff(data, size)
 		data = (((0b01111110<<size) | data)<<8) | 0b01111110
-		pass
+		return data
 	
 	def _makecontrol(self):
 		control = (self.send_window_start<<4) | self.recv_window_start
@@ -91,12 +121,14 @@ class HDLC:
 			m  = m << 1
 			m2 = m2 << 1
 			i += 1
-		return data
+		return data, width-1
 				
 
 if __name__ == '__main__':
 	hdlc = HDLC()
 	
-	print repr(from_big_int(0x00010203040506070809, 20))
-	print hex(to_big_int(from_big_int(0x00010203040506070809, 20)))
-			
+	data = hdlc.send(1, 0b10101, 5)
+	out.write(bin(data)+"\n")
+	data = from_big_int(data)
+	out.write(repr(data)+"\n")
+	hdlc.recv(data)
