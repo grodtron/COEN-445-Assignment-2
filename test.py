@@ -1,3 +1,13 @@
+from itertools import izip, islice
+
+def from_big_int(data, length):
+	data = hex(data)[2:-1].zfill(length)
+	return ''.join( chr( int(a,16)<<4 | int(b,16) ) for a,b in izip(islice(data, 0, None, 2), islice(data, 1, None, 2)) )
+	
+def to_big_int(data):
+	return reduce( lambda a,b: (a<<8)|ord(b), data, 0 )
+
+
 class HDLC:
 
 	def __init__(self):
@@ -14,6 +24,8 @@ class HDLC:
 		
 	
 	def recv(self):
+		data = b'thisissomeshitrighthere'
+		size = 1
 		# prepend control
 		# prepend address
 		# append FCS (dummy)
@@ -85,5 +97,6 @@ class HDLC:
 if __name__ == '__main__':
 	hdlc = HDLC()
 	
-	hdlc.send(127, 0xFFFF, 32)
+	print repr(from_big_int(0x00010203040506070809, 20))
+	print hex(to_big_int(from_big_int(0x00010203040506070809, 20)))
 			
