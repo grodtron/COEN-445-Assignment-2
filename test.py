@@ -31,7 +31,7 @@ class HDLC:
 		# send
 		pass
 	
-	def _stuff(self, data):
+	def _bitstuff(self, data):
 		width = (10**5)
 		i = width
 		m = self.mask << i
@@ -53,8 +53,8 @@ class HDLC:
 			i -= 1
 		return data
 
-	def _unstuff(self, data, length):
-		width = length
+	def _unbitstuff(self, data, length):
+		width = length + 1
 		i = 0
 		m = self.mask << 1
 		m2 = 1
@@ -68,8 +68,6 @@ class HDLC:
 				# invert the mask so that it masks the 5 1s and zero and everything above.
 				# have to use weird xor shit, since regular ~ doesn't work properly
 				tmp_mask ^= (1 << (width + 1)) - 1
-				#print "  " + bin(data)
-				#print "  " + bin(tmp_mask & 0b1111111111111111111111111111111111111111111111111111111111)
 				# Shift the top half down and OR with the bottom half to insert a 0.
 				data = ((data & tmp_mask) >> 1) | (data & ~tmp_mask)
 
@@ -78,18 +76,16 @@ class HDLC:
 			m  = m << 1
 			m2 = m2 << 1
 			i += 1
-			#print("   -")
 		return data
 				
 
 if __name__ == '__main__':
-	# msg = randint(0, 1<<(10**5))
 	hdlc = HDLC()
 	
 	for i in xrange(2**30):
-		if i != hdlc._unstuff(hdlc._stuff(i), len(bin(i))-2):
+		if i != hdlc._unbitstuff(hdlc._bitstuff(i), len(bin(i))-len('0b')):
 			print "Error on " + str(i)
 			print "  original => " + bin(i)
-			print "  stuff    => " + bin(hdlc._stuff(i))
-			print "  unstuff  => " + bin(hdlc._unstuff(hdlc._stuff(i), len(bin(i))-2))
+			print "  stuff    => " + bin(hdlc._bitstuff(i))
+			print "  unstuff  => " + bin(hdlc._unbitstuff(hdlc._bitstuff(i), len(bin(i))-len('0b')))
 			
