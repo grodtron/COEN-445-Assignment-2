@@ -23,16 +23,16 @@ class HDLC:
 		pass
 	
 	def send(self, address, data, size):
-		print bin(data)
 		data = (((address<<(size+8)) | (self._makecontrol()<<size) | data)<<16) | 0x0F55
 		size += 32
 		data, size = self._bitstuff(data, size)
 		data = (((0b01111110<<size) | data)<<8) | 0b01111110
-		open("test.txt", "a").write( bin(data))
 		pass
 	
 	def _makecontrol(self):
-		return (self.send_window_start<<4) | self.recv_window_start
+		control = (self.send_window_start<<4) | self.recv_window_start
+		self.send_window_start += 1
+		return control
 	
 	def _bitstuff(self, data, size):
 		width = size
